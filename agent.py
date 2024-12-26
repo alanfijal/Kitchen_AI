@@ -16,6 +16,7 @@ from tavily import TavilyClient
 from qdrant_client import QdrantClient
 
 from pymongo import MongoClient
+from enum import Enum 
 
 load_dotenv()
 
@@ -28,6 +29,14 @@ client = MongoClient(cosmos_mongo_uri)
 db = client[database_name]
 collection = db[collection_name]
 
+class DietaryRestrictions(Enum):
+    VEGATARIAN = "vegetarian"
+    VEGAN = "vegan"
+    HALAL = "halal"
+    KOSHER = "kosher"
+    GLUTEN_FREE = "gluten-free"
+    DIARY_FREE = "diary-free"
+    NUT_FREE = "nut-free"
 
 
 
@@ -47,6 +56,7 @@ class Retriever:
             api_version=os.getenv("AZURE_OPENAI_API_VERSION_ADA"),
             api_key=os.getenv("AZURE_OPENAI_API_KEY_ADA")
         )
+        self.dietary_restrictions = set()
         set_debug(True)
         set_verbose(True)
 
@@ -62,9 +72,19 @@ class Retriever:
             examples=question_examples
         )
 
-        instructions = ChatPromptTemplate.from_messages(
-            prompt + [few_shots_prompt]
-        )
+        if len(self.dietary_restrictions) > 0:
+            dietary_restrictions_str = ", ".join(list(self.dietary_restrictions))
+            instructions = ChatPromptTemplate.from_messages(
+                prompt + [few_shots_prompt] + [
+                    ("system", f"Important: The user has the following dietary restrictions: {dietary_restrictions_str}. "
+                              "You MUST adapt all recipes to accommodate these restrictions by suggesting appropriate substitutions. "
+                              "Always explain the substitutions you're making and why.")
+                ]
+            )
+        else:
+            instructions = ChatPromptTemplate.from_messages(
+                prompt + [few_shots_prompt]
+            )
 
         base_prompt = hub.pull("langchain-ai/openai-functions-template")
         prompt_template = base_prompt.partial(instructions=instructions)

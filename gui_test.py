@@ -1,5 +1,5 @@
 import streamlit as st
-from agent import Retriever
+from agent import Retriever, DietaryRestrictions
 import traceback
 from dotenv import load_dotenv
 from pymongo import MongoClient
@@ -7,6 +7,8 @@ import os
 
 
 load_dotenv()
+
+
 
 
 cosmos_mongo_uri = os.getenv("COSMOS_MONGO_URI")
@@ -20,10 +22,14 @@ collection = db[collection_name]
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+if "dietary_restrictions" not in st.session_state:
+    st.session_state.dietary_restrictions = []
+
 @st.cache_resource
 def get_agent():
     try:
         retriever = Retriever()
+        retriever.dietary_restrictions = set(st.session_state.dietary_preferences)
         agent = retriever.set_agent()
         if agent is None:
             raise ValueError("Agent creation failed in Retriever.set_agent()")
@@ -35,7 +41,24 @@ def get_agent():
 
 def main():
     st.title("Recipe Assistant")
+    with st.sidebar:
+        st.header("Dietary Preferences")
+        available_restrictions = [restriction.value for restriction in DietaryRestrictions]
 
+        if "dietary_preferences" not in st.session_state:
+            st.session_state.dietary_preferences = []
+
+        selected_restrictions = st.multiselect(
+            "Select your dietary restrictions",
+            options=available_restrictions,
+            default=st.session_state.dietary_preferences
+        )
+
+        if selected_restrictions != st.session_state.dietary_preferences:
+            st.session_state.dietary_preferences = selected_restrictions
+            get_agent.clear()
+
+        
     agent_exec = get_agent()
     if agent_exec is None:
         st.error("Failed to initialize the agent. Please check the error messages above and your configuration.")
