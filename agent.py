@@ -137,7 +137,7 @@ class Retriever:
             recipes = []
             for item in collection.find():
                 recipes.append(item["question"])
-            return recipes
+            return recipes[:-5]
         
         return Tool(
             name="retrieve_history",
