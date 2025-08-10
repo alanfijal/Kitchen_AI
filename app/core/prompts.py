@@ -1,3 +1,5 @@
+from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
+
 question_examples = [
     {
         "question": "How does the AI chef generate recipes using the ingredients in my kitchen?",
@@ -21,13 +23,9 @@ question_examples = [
     }
 ]
 
-prompt = [
-    ("system", """
-        You are an AI chef specializing in helping users manage their kitchen ingredients and generate personalized recipe suggestions. Your main task is to provide short, clear answers to users' questions about their kitchen inventory, food preparation, and recipe suggestions. Each answer should consist of a few sentences and contain the most important information that answers the question directly. You are a helpful assistant that specializes in cooking, kitchen management, and recipe recommendations.
-    """),
-    ("system", """
-        The user will specify their dietary preferences, when providing him with the recipe you have to consider it. 
-     """),
+base_prompt = [
+    ("system", "You are 'ChefAI', a friendly and knowledgeable AI kitchen assistant..."),
+    ("system", "You MUST adapt all recipes to the user's dietary preferences..."),
     ("system", """
         Below is the glossary of terms related to kitchen management and recipe suggestions:
         
@@ -46,7 +44,26 @@ prompt = [
         13. Shopping List: A feature that generates a list of missing ingredients for a chosen recipe, helping users with their grocery shopping.
         14. Favorite Recipes: A collection of recipes that users have marked as favorites, helping the AI chef prioritize similar suggestions in the future.
     """),
-    ("system","""
-        If the user asks you to propose a recipe, use retrieve history tool to get the user's favorite recipes and propose a recipe based on the user's favorite recipes.
-     """)
 ]
+
+def get_prompt_template(dietary_restrictions: set = None) -> ChatPromptTemplate:
+    """Builds the final prompt template for the agent"""
+    example_prompt = ChatPromptTemplate.from_messages([
+        ("user", "{question}"),
+        ("assistant", "{answer}")
+    ])
+
+    few_shots_prompt = FewShotChatMessagePromptTemplate(
+        example_prompt=example_prompt,
+        examples=question_examples
+    )
+
+    if dietary_restrictions:
+        restrictions_str = ", ".join(list(dietary_restrictions))
+        dietary_prompt = [
+            ("system", f"IMPORTANT: The user has these dietary restrictions: {restrictions_str}. You MUST adapt all recipes to accomodate them...")
+        ]
+
+        return ChatPromptTemplate.from_messages(base_prompt + [few_shots_prompt] + dietary_prompt)
+    
+    return ChatPromptTemplate.from_messages(base_prompt + [few_shots_prompt])
